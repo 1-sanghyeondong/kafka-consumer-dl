@@ -1,6 +1,6 @@
-### Platform Kafka Retry Worker
+### Kafka DeadLetter Queue
 
-#### Microservices의 실패 메시지를 중앙에서 관리하고 재처리(Retry)하는 전용 워커 서비스
+#### Kafka 실패 메시지를 중앙에서 관리하고 재처리(Retry)하는 Kafka DeadLetter Queue 서비스
 - **중앙 집중형 관리 (Centralized)**: 각 서비스가 개별적으로 재시도 로직을 구현할 필요 없이 이 워커 하나가 모든 `*-retry-1m` 토픽을 통합 구독하여 처리
 - **정밀한 지연 처리 (Smart Delay)**: 메시지 헤더 분석을 통해 설정된 시간(예: 1분)을 정확히 준수하여 재발행함으로써 시스템 부하를 분산하고 복구 시간을 확보
 - **신뢰성 있는 실패 관리 (DLQ)**: 최대 재시도 횟수 초과 시 자동으로 DLQ(Dead Letter Queue)로 격리하여 데이터 유실을 방지하고 실패 원인 추적 지원
