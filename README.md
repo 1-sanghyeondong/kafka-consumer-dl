@@ -10,7 +10,8 @@
 ### 🚀 퀵 스타트
 
 #### 1. Gradle 의존성 추가
-프로젝트의 `build.gradle` 파일에 아래 의존성을 추가
+프로젝트의 `build.gradle` 파일에 아래 의존성을 추가   
+(관련 레포지토리: https://github.com/1-sanghyeondong/common-kafka)
 
 ```gradle
 dependencies {
