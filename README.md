@@ -53,6 +53,8 @@ retry:
 #### 3. 고도화된 격리 및 복구 flow
 메시지의 상태에 따라 원본 토픽으로 재발행하거나 DLQ로 격리합니다.
 
+<img width="960" height="540" alt="kafka dlq" src="https://github.com/user-attachments/assets/147a8648-1632-4ef8-818c-2f59b1f30a96" />
+
 ```mermaid
 flowchart TD
     %% 스타일 정의
