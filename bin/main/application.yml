@@ -1,0 +1,26 @@
+server:
+  port: 8081
+
+spring:
+  kafka:
+    bootstrap-servers: localhost:9092
+
+    consumer:
+      group-id: platform-retry-worker-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      properties:
+        metadata.max.age.ms: 10000
+
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+# Worker 전용 커스텀 설정
+retry:
+  worker:
+    topic-pattern: ".*-retry-1m" # 구독할 토픽 패턴
+    delay-ms: 60000               # 1분 대기 (밀리초)
+    max-retry-count: 2            # 최대 2번 더 시도 (총 3회 실행)
+    dlq-suffix: "-dlq"            # 실패 시 보낼 토픽 접미사
