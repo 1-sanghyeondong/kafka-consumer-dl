@@ -54,54 +54,35 @@ retry:
 메시지의 상태에 따라 원본 토픽으로 재발행하거나 DLQ로 격리합니다.
 
 ```mermaid
-flowchart TD
-    %% 스타일 정의
-    classDef kafka fill:#ECECFF,stroke:#333,stroke-width:2px;
-    classDef worker fill:#FFF4E6,stroke:#D9730D,stroke-width:2px,stroke-dasharray: 5 5;
-    classDef process fill:#EDF7ED,stroke:#333,stroke-width:1px;
-    classDef decision fill:#FFF,stroke:#333,stroke-width:1px;
-    classDef success stroke:#0D730D,stroke-width:2px;
-    classDef fail stroke:#D90D0D,stroke-width:2px;
+sequenceDiagram
+    participant S as 서비스 (Service)
+    participant K as Kafka (Retry Topic)
+    participant W as 워커 (Retry Project)
+    participant D as DLQ (Dead Letter)
 
-    %% 외부 시스템
-    RetryTopic("Retry Topic (*-retry-1m)"):::kafka
-    OriginalTopic("Original Topic"):::kafka
-    DLQ("DLQ Topic (*-dlq)"):::kafka
+    Note over S, W: [1차 시도]
+    S->>S: 1. 비즈니스 로직 수행 (실패💥)
+    S->>K: 2. Retry 토픽으로 전송 (count:0)
+    S->>S: 3. ACK (서비스는 할일 끝)
 
-    %% 내부 로직
-    subgraph Worker ["Platform Retry Worker"]
-        direction TB
-        Listener(["GenericRetryListener Received"]):::process
-        Orchestrator{RetryOrchestrator}:::decision
-        
-        Delay["Enforce Delay (Thread.sleep)"]:::process
-        CountCheck{"Retry Count < Max?"}:::decision
-        
-        ForwardOriginal["Forward to Original Topic"]:::process
-        ForwardDLQ["Forward to DLQ Topic"]:::process
-        
-        ACK((ACK Offset Commit)):::success
+    Note over K, W: [대기 및 반송]
+    K->>W: 4. 워커가 메시지 수신
+    W->>W: 5. 1분 대기 (Sleep)
+    W->>S: 6. 원본 토픽으로 재발송 (count:1)
+    W->>W: 7. ACK (워커도 할일 끝)
+
+    Note over S, W: [2차 시도 (재시도)]
+    S->>S: 8. 서비스가 다시 받아서 수행
+    
+    alt 중간에 성공하면? (Happy Path)
+        S->>S: 9. 로직 성공✅
+        S->>S: 10. ACK (끝! 아무데도 안 보냄)
+        Note right of S: 상황 종료 (Loop 탈출)
+    else 또 실패하면? (Sad Path)
+        S->>K: 9. Retry 토픽으로 전송 (count:1)
+        K->>W: 10. 워커 수신 -> 1분 대기
+        W->>S: 11. 원본 토픽으로 재발송 (count:2)
     end
-
-    %% 흐름 연결
-    RetryTopic --> Listener
-    Listener --> Orchestrator
-    
-    Orchestrator -->|"Check Header & Time"| Delay
-    Delay --> CountCheck
-    
-    CountCheck -- "YES (Retry)" --> ForwardOriginal
-    CountCheck -- "NO (Exceeded)" --> ForwardDLQ
-    
-    ForwardOriginal -.-> OriginalTopic
-    ForwardDLQ -.-> DLQ
-    
-    ForwardOriginal --> ACK
-    ForwardDLQ --> ACK
-
-    %% 스타일 적용
-    linkStyle 4,5,7 stroke:#0D730D,stroke-width:2px,color:green;
-    linkStyle 6,8 stroke:#D90D0D,stroke-width:2px,color:red;
 ```
 
 #### 🛡️ Resiliency & Fail-Safe
