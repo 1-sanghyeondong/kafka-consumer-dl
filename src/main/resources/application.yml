@@ -24,3 +24,4 @@ retry:
     delay-ms: 60000               # 1분 대기 (밀리초)
     max-retry-count: 2            # 최대 2번 더 시도 (총 3회 실행)
     dlq-suffix: "-dlq"            # 실패 시 보낼 토픽 접미사
+    concurrency: 3                # 병렬 처리 리스너 개수

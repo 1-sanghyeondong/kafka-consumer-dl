@@ -1,6 +1,6 @@
 package com.common.kafka.consumer.dl.listener;
 
-import com.platform.retry.service.RetryOrchestrator;
+import com.common.kafka.consumer.dl.service.RetryOrchestrator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -18,7 +18,7 @@ public class GenericRetryListener {
             topicPattern = "${retry.worker.topic-pattern}",
             groupId = "${spring.kafka.consumer.group-id}",
             containerFactory = "retryKafkaListenerContainerFactory",
-            concurrency = "3"
+            concurrency = "${retry.worker.concurrency:3}"
     )
     public void onMessage(ConsumerRecord<String, String> record, Acknowledgment ack) {
         try {

@@ -1,6 +1,7 @@
 package com.common.kafka.consumer.dl.service;
 
 import com.common.kafka.constant.ResiliencyHeader;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -20,6 +21,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class RetryOrchestrator {
     private final KafkaTemplate<String, String> kafkaTemplate;
+    private final MeterRegistry meterRegistry;
 
     @Value("${retry.worker.delay-ms}")
     private long delayMs;
@@ -77,10 +79,10 @@ public class RetryOrchestrator {
         headers.add(new RecordHeader(RETRY_COUNT_HEADER, String.valueOf(nextRetryCount).getBytes()));
 
         ProducerRecord<String, String> producerRecord = new ProducerRecord<>(
-                targetTopic, null, record.key(), record.value(), headers
-        );
+                targetTopic, null, record.key(), record.value(), headers);
 
         kafkaTemplate.send(producerRecord);
+        meterRegistry.counter("kafka.retry.count", "topic", targetTopic).increment();
         log.info("[retry] sent to original: {}. count: {}", targetTopic, nextRetryCount);
     }
 
@@ -89,10 +91,10 @@ public class RetryOrchestrator {
         headers.add(new RecordHeader("x-dlq-reason", reason.getBytes(StandardCharsets.UTF_8)));
 
         ProducerRecord<String, String> dlqRecord = new ProducerRecord<>(
-                dlqTopic, null, record.key(), record.value(), headers
-        );
+                dlqTopic, null, record.key(), record.value(), headers);
 
         kafkaTemplate.send(dlqRecord);
+        meterRegistry.counter("kafka.dlq.count", "topic", dlqTopic, "reason", reason).increment();
     }
 
     private List<Header> copyHeadersExcept(ConsumerRecord<?, ?> record, String ignoreKey) {
