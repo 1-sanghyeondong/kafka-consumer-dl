@@ -28,18 +28,7 @@ dependencies {
 ```yaml
 spring:
   kafka:
-    consumer:
-      properties:
-        metadata.max.age.ms: 10000   # 새로운 Retry 토픽 자동 감지 주기
-      enable-auto-commit: false      # 수동 커밋 모드 (안정성 확보)
-
-retry:
-  worker:
-    topic-pattern: ".*-retry-1m"     # 구독할 토픽 정규식
-    delay-ms: 60000                  # 재시도 대기 시간 (1분)
-    max-retry-count: 2               # 최대 재시도 횟수
-    dlq-suffix: "-dlq"               # 실패 시 격리 토픽 접미사
-    concurrency: 3                   # 병렬 리스너 개수 (기본값 3)
+    bootstrap-servers: 카프카 브로커 주소 (입력하지 않으면 앱 구동 실패)
 ```
 
 ---
