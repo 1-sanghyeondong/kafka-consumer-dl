@@ -79,14 +79,3 @@ sequenceDiagram
 | `GET` | `/api/messages` | DLQ(Dead Letter) 메시지 목록 조회 (페이징, 필터링 지원) |
 | `POST` | `/api/messages/resend` | DLQ에 저장된 메시지를 원본 토픽으로 재발행 (startId ~ endId 범위) |
 | `DELETE` | `/api/messages/retry-queue` | Redis Retry 대기열의 메시지 삭제 (전체 또는 특정 Key) |
-
-**API 예시 (cURL)**:
-
----
-
-### 📊 모니터링 및 메트릭 (Monitoring)
-Micrometer를 통해 재시도 및 DLQ 현황을 실시간으로 모니터링할 수 있습니다.
-- **kafka.retry.count**: 성공적으로 원본 토픽으로 재발행된 메시지 수 (Tag: `topic`)
-- **kafka.dlq.count**: 최대 재시도 횟수 초과로 DLQ로 이동된 메시지 수 (Tags: `topic`, `reason`)
-
-Prometheus 엔드포인트: `/actuator/prometheus`
