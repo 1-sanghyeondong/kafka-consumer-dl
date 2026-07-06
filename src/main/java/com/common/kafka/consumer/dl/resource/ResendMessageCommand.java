@@ -1,15 +1,15 @@
 package com.common.kafka.consumer.dl.resource;
 
 import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-@Data
-@Builder
+@Getter
 @NoArgsConstructor
 @AllArgsConstructor
-public class MessageQuery {
+public class ResendMessageCommand {
+    private String targetTopic;
     private int partition;
-    private int limit = 200;
+    private long startOffset;
+    private long endOffset;
 }

@@ -28,17 +28,15 @@ public class RetryOrchestrator {
 
     private final RetryWorkerProperties properties;
     private final RedisTemplate<String, Object> redisTemplate;
-    private final KafkaDeadLetterRepository kafkaDeadLetterRepository;
     private final KafkaTemplate<String, Object> kafkaTemplate;
     private final ObjectMapper objectMapper;
 
     public static final String REDIS_QUEUE_KEY = "platform:retry:queue";
     public static final String RETRY_COUNT_HEADER = "x-retry-count";
 
-    public RetryOrchestrator(RetryWorkerProperties properties, RedisTemplate<String, Object> redisTemplate, KafkaDeadLetterRepository kafkaDeadLetterRepository, @Qualifier("commonKafkaTemplate") KafkaTemplate<String, Object> kafkaTemplate, ObjectMapper objectMapper) {
+    public RetryOrchestrator(RetryWorkerProperties properties, RedisTemplate<String, Object> redisTemplate, @Qualifier("commonKafkaTemplate") KafkaTemplate<String, Object> kafkaTemplate, ObjectMapper objectMapper) {
         this.properties = properties;
         this.redisTemplate = redisTemplate;
-        this.kafkaDeadLetterRepository = kafkaDeadLetterRepository;
         this.kafkaTemplate = kafkaTemplate;
         this.objectMapper = objectMapper;
     }
@@ -48,14 +46,12 @@ public class RetryOrchestrator {
         int currentRetryCount = getIntHeader(record, RETRY_COUNT_HEADER);
 
         if (originalTopic == null) {
-            log.warn("missing original topic header | topic: {}, key: {}", record.topic(), record.key());
-            saveToDeadLetter(record, "missing x-original-topic header");
+            log.warn("missing original topic header | topic: {}, partition: {}, key: {}", record.topic(), record.partition(), record.key());
             return;
         }
 
         if (currentRetryCount >= properties.getMaxRetryCount()) {
-            log.warn("max retry reached ({}) | topic: {}, key: {}", currentRetryCount, record.topic(), record.key());
-            saveToDeadLetter(record, "max retry count exceeded");
+            log.warn("max retry reached ({}) | topic: {}, partition: {}, key: {}", currentRetryCount, record.topic(), record.partition(), record.key());
             return;
         }
 
@@ -63,10 +59,18 @@ public class RetryOrchestrator {
         long score = System.currentTimeMillis() + delay;
 
         Object value = record.value();
-        try {
-            value = objectMapper.readValue(record.value(), Object.class);
-        } catch (Exception e) {
-            // ignore
+        String strValue = record.value();
+        if (strValue != null) {
+            String trimmed = strValue.trim();
+
+            if ((trimmed.startsWith("{") && trimmed.endsWith("}")) ||
+                    (trimmed.startsWith("[") && trimmed.endsWith("]"))) {
+                try {
+                    value = objectMapper.readValue(trimmed, Object.class);
+                } catch (Exception e) {
+                    // 파싱 실패 시 무시 (원본 String 그대로 유지)
+                }
+            }
         }
 
         RetryMessage dto = RetryMessage.builder()
@@ -87,27 +91,11 @@ public class RetryOrchestrator {
                 .map(entry -> new RecordHeader(entry.getKey(), entry.getValue().getBytes(StandardCharsets.UTF_8)))
                 .collect(Collectors.toList());
 
-        int nextRetryCount = dto.getRetryCount() + 1;
-        headers.add(new RecordHeader(RETRY_COUNT_HEADER, String.valueOf(nextRetryCount).getBytes(StandardCharsets.UTF_8)));
+        int retryCount = dto.getRetryCount() + 1;
+        headers.add(new RecordHeader(RETRY_COUNT_HEADER, String.valueOf(retryCount).getBytes(StandardCharsets.UTF_8)));
 
         kafkaTemplate.send(new ProducerRecord<>(dto.getOriginalTopic(), null, dto.getKey(), dto.getValue(), headers));
-        log.info("resent to original topic | topic: {}, key: {}, nextRetry: {}", dto.getOriginalTopic(), dto.getKey(), nextRetryCount);
-    }
-
-    private void saveToDeadLetter(ConsumerRecord<String, String> record, String reason) {
-        String originalTopic = getHeader(record, ResiliencyHeader.ORIGINAL_TOPIC.getKey());
-        String topic = originalTopic != null ? originalTopic : record.topic();
-
-        KafkaDeadLetter kafkaDeadLetter = KafkaDeadLetter.builder()
-                .topic(topic)
-                .messageKey(record.key())
-                .payload(String.valueOf(record.value()))
-                .exceptionMessage(reason)
-                .status(KafkaDeadLetterStatus.FAILED)
-                .build();
-
-        kafkaDeadLetterRepository.save(kafkaDeadLetter);
-        log.warn("saved to kafka dead letters table | key: {}, topic: {}, id: {}, reason: {}", record.key(), topic, kafkaDeadLetter.getId(), reason);
+        log.info("resent to original topic | topic: {}, key: {}, retry: {}", dto.getOriginalTopic(), dto.getKey(), retryCount);
     }
 
     private Map<String, String> extractHeaders(ConsumerRecord<String, String> record) {

@@ -22,14 +22,16 @@ public class RetryScheduler {
     private final RetryOrchestrator retryOrchestrator;
     private final ObjectMapper objectMapper;
 
-    private static final String LUA_SCRIPT = "local queue = KEYS[1]\n" +
-            "local maxScore = ARGV[1]\n" +
-            "local limit = ARGV[2]\n" +
-            "local items = redis.call('ZRANGEBYSCORE', queue, '-inf', maxScore, 'LIMIT', 0, limit)\n" +
-            "if #items > 0 then\n" +
-            "    redis.call('ZREM', queue, unpack(items))\n" +
-            "end\n" +
-            "return items";
+    private static final String LUA_SCRIPT = """
+            local queue = KEYS[1]
+            local maxScore = ARGV[1]
+            local limit = ARGV[2]
+            local items = redis.call('ZRANGEBYSCORE', queue, '-inf', maxScore, 'LIMIT', 0, limit)
+            if #items > 0 then
+                redis.call('ZREM', queue, unpack(items))
+            end
+            return items
+            """;
 
     @SuppressWarnings("unchecked")
     @Scheduled(fixedDelay = 1000)
@@ -37,8 +39,11 @@ public class RetryScheduler {
         try {
             long now = System.currentTimeMillis();
 
-            DefaultRedisScript<List<Object>> redisScript = new DefaultRedisScript<>(LUA_SCRIPT, (Class<List<Object>>) (Class<?>) List.class);
-            List<Object> items = redisTemplate.execute(redisScript, redisTemplate.getStringSerializer(), (RedisSerializer<List<Object>>) redisTemplate.getValueSerializer(), Collections.singletonList(RetryOrchestrator.REDIS_QUEUE_KEY), String.valueOf(now), "50");
+            DefaultRedisScript<List<Object>> redisScript = new DefaultRedisScript<>(LUA_SCRIPT,
+                    (Class<List<Object>>) (Class<?>) List.class);
+            List<Object> items = redisTemplate.execute(redisScript, redisTemplate.getStringSerializer(),
+                    (RedisSerializer<List<Object>>) redisTemplate.getValueSerializer(),
+                    Collections.singletonList(RetryOrchestrator.REDIS_QUEUE_KEY), String.valueOf(now), "50");
             if (items.isEmpty()) {
                 return;
             }
