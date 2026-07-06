@@ -8,6 +8,6 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @ConfigurationProperties(prefix = "retry.worker")
 public class RetryWorkerProperties {
-    private long delayMs = 10000;
+    private long delayMs = 20000;
     private int maxRetryCount = 3;
 }
